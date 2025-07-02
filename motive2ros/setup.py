@@ -5,7 +5,7 @@ package_name = 'motive2ros'
 setup(
     name=package_name,
     version='1.0.0',
-    packages=[package_name],
+    packages=find_packages(),
     py_modules=[],
     data_files=[
         ('share/ament_index/resource_index/packages',
@@ -21,11 +21,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'talker = motive2ros.publisher_member_function:main',
-            'listener = motive2ros.subscriber_member_function:main',
-            'datastream = motive2ros.natnet_connector:main',
-            'locpub = motive2ros.location_publisher:main',
-            'loclist = motive2ros.drone_controller:main',
+            'talker = motive2ros.ros2tests.testpub:main',
+            'listener = motive2ros.ros2tests.testsub:main'
+            
         ],
     },
 )

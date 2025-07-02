@@ -1,0 +1,169 @@
+import sys
+import time
+
+from motive2ros.library.NatNetClient import NatNetClient
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import String
+from geometry_msgs.msg import Pose, Point, Quaternion
+
+
+import threading
+import cflib.crtp
+from cflib.crazyflie import Crazyflie
+from cflib.crazyflie.mem import MemoryElement
+from cflib.crazyflie.mem import Poly4D
+from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
+from cflib.utils import uri_helper
+from cflib.utils.reset_estimator import reset_estimator
+from cflib.positioning.motion_commander import  MotionCommander
+
+newpos = None
+newrot = None
+
+lock = threading.Lock()
+
+class control():
+    def rrbf(self, new_id, position, rotation):
+        global newpos
+        global newrot
+    
+        newpos = position
+        newrot = rotation
+
+    def mocap_listener(self, local_ip, cf: Crazyflie, server_ip: str = '10.131.196.172'):
+        global newpos
+        global newrot
+        # local_ip and server_ip should be used as strings
+
+        client = NatNetClient()
+        client.set_use_multicast(False)
+        client.set_client_address(local_ip)
+        client.set_server_address(server_ip)
+        client.rigid_body_listener = self.rrbf
+        client.set_print_level(0)
+        
+        while True:
+            client.run('d')
+
+            time.sleep(1)
+            if client.connected():
+                print("Connected to server")
+                break
+            else:
+                print("Not connected")
+        
+        while True:
+            with lock:
+                if newpos is not None and newrot is not None:
+                    x, y, z = newpos
+                    qx, qy, qz, qw = newrot
+                    cf.extpos.send_extpose(x, y, z, qx, qy, qz, qw)
+                    print(f"Sending extpos: x={x:.2f}, y={y:.2f}, z={z:.2f}")
+                time.sleep(0.1)
+
+                    # 10hz data send rate
+
+    def init_drone(self, cf: Crazyflie):
+        
+        cf.platform.send_arming_request(True)
+        print("Crazyflie armed")
+        cf.param.set_value('stabilizer.estimator', '2')
+        print('values set')
+       
+
+    def takeoff(self, cf: Crazyflie):
+        global newpos
+        global newrot
+        commander = cf.high_level_commander
+
+        commander.takeoff(0.5, 5)
+        time.sleep(5)
+        commander.stop()
+        # this part doesnt work ^^^ the stop function doesnt do anything for some reason, need to investigate further
+
+        # while newpos is None or newrot is None:
+        #     time.sleep(1)
+        #     print("Waiting for pose data")
+        # for _ in range(100):
+        #     print("this would be a takeoff attempt")
+        #     time.sleep(0.1)
+
+class mocap_basic_pub(Node):
+    def __init__(self, name: str, hz = 180, group = 10, local = "10.131.220.228", server = "10.131.196.172"):
+        #initialize the ip addresses 
+        self.rate = hz
+        self.localip = local
+        self.serverip = server
+        self.groupid = group
+        self.name = name
+        
+        self.counter = 0
+        self.client = NatNetClient()
+        super().__init__('minimal_publisher')
+        self.publisher_ = self.create_publisher(Pose, name, group)
+
+
+        self.mocap_init()
+        self.running = True
+      
+
+        
+
+    def rrbf(self, new_id, position, rotation):
+        # Format as "id;x,y,z;qx,qy,qz,qw"
+        pos_str = ",".join(f"{x:.3f}" for x in position)
+        rot_str = ",".join(f"{x:.4f}" for x in rotation)
+        msg_str = f"{new_id};{pos_str};{rot_str}"
+        msg = String()
+        msg.data = msg_str
+        self.publisher_.publish(msg)
+        
+        self.counter += 1
+        time = self.counter/self.rate
+        if self.counter % 10 == 0:
+            print(f"\rFrame {self.counter} Time {time:.2f} Position: {self.position.x:.3f}, {self.position.y:.3f}, {self.position.z:.3f}", end='', flush=True)
+            #self.get_logger().info(f"\rFrame {self.counter} Time {time} Position: {self.position.x}, {self.position.y}, {self.position.z}", end='',flush=True)
+        
+        
+        
+
+    def mocap_init(self):
+
+        # init mocap
+        
+        self.client.set_use_multicast(False)
+        self.client.set_client_address(self.localip)
+        self.client.set_server_address(self.serverip)
+        self.client.rigid_body_listener = self.rrbf
+        self.client.set_print_level(0)
+
+        # connect loop until it connects
+        while True:
+            self.client.run('d')
+
+            time.sleep(1)
+            if self.client.connected():
+                
+                break
+            else:
+                print("Not connected")
+    
+    def destroy_node(self):
+        self.running = False
+        self.client.shutdown()
+        super().destroy_node()
+                
+class mocap_basic_sub(Node):
+    def __init__(self, id, name: str, group = 10):
+        self.groupid = group
+        self.streamid = id
+        self.name = name
+        super().__init__(name)
+        self.subscription = self.create_subscription(Pose, name, self.listener_callback, group)
+
+    def listener_callback(self, msg):
+        x, y, z = msg.position
+        qx,qy,qz,qw = msg.orientation
+        print(f"Position: x={x}, y={y}, z={z}")
+        print(f"Orientation: x={qx}, y={qy}, z={qz}, w={qw}")
