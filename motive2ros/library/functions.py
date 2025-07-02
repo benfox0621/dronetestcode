@@ -90,9 +90,9 @@ class control():
         #     time.sleep(0.1)
 
 class mocap_basic_pub(Node):
-    def __init__(self, hz = 180, group = 10, local = "10.131.220.228", server = "10.131.196.172"):
+    def __init__(self, group, local, server):
         #initialize the ip addresses 
-        self.rate = hz
+        
         self.localip = local
         self.serverip = server
         self.groupid = group
@@ -129,7 +129,7 @@ class mocap_basic_pub(Node):
 
         
         self.counter += 1
-        time = self.counter/self.rate
+        
         if self.counter % 10 == 0:
             pass
             #print(f"\rFrame {self.counter} Time {time:.2f}", end='', flush=True)
@@ -163,7 +163,7 @@ class mocap_basic_pub(Node):
                 
 class mocap_basic_sub(Node):
     
-    def __init__(self, id, group = 10):
+    def __init__(self, group):
         self.groupid = group
         
         
@@ -199,10 +199,10 @@ class mocap_basic_sub(Node):
             print(f"Rotation: {rotation}")
 
 class complete_node_pub(mocap_basic_pub):
-    def __init__(self):
+    def __init__(self, group = 10, local = "10.131.220.228", server = "10.131.196.172"):
         rclpy.init()
 
-        publisher = mocap_basic_pub()
+        publisher = mocap_basic_pub(group, local, server)
         try: 
             rclpy.spin(publisher)
         except KeyboardInterrupt:
@@ -213,11 +213,11 @@ class complete_node_pub(mocap_basic_pub):
             rclpy.shutdown()
 
 class complete_node_sub(mocap_basic_sub):
-    def __init__(self, id):
+    def __init__(self, group = 10):
         rclpy.init()
         
-        self.id = str(id)
-        subscriber = mocap_basic_sub(self.id)
+        
+        subscriber = mocap_basic_sub(group)
         try: 
             rclpy.spin(subscriber)
         except KeyboardInterrupt:
