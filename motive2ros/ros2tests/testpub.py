@@ -1,19 +1,7 @@
-from motive2ros.library.functions import mocap_basic_pub
-import rclpy
-from rclpy.node import Node
+from motive2ros.library.functions import complete_node_pub
 
 def main():
-    rclpy.init()
-
-    publisher = mocap_basic_pub()
-    try: 
-        rclpy.spin(publisher)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        publisher.destroy_node()
-
-        rclpy.shutdown()
+    complete_node_pub()
 
 if __name__ == '__main__':
     main()

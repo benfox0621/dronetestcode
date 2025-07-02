@@ -96,6 +96,7 @@ class mocap_basic_pub(Node):
         self.localip = local
         self.serverip = server
         self.groupid = group
+        
     
         
         self.counter = 0
@@ -107,9 +108,6 @@ class mocap_basic_pub(Node):
         self.mocap_init()
         self.running = True
       
-
-        
-
     def rrbf(self, new_id, position, rotation):
         
         if not rclpy.ok():
@@ -136,9 +134,6 @@ class mocap_basic_pub(Node):
             pass
             #print(f"\rFrame {self.counter} Time {time:.2f}", end='', flush=True)
             #self.get_logger().info(f"\rFrame {self.counter} Time {time} Position: {self.position.x}, {self.position.y}, {self.position.z}", end='',flush=True)
-        
-        
-        
 
     def mocap_init(self):
 
@@ -167,11 +162,16 @@ class mocap_basic_pub(Node):
         super().destroy_node()
                 
 class mocap_basic_sub(Node):
+    
     def __init__(self, id, group = 10):
         self.groupid = group
-        self.streamid = str(id)
+        
+        
         
         super().__init__('minimal_subscriber')
+        self.declare_parameter('id', 0)
+        id_param = self.get_parameter('id').get_parameter_value().integer_value
+        self.streamid = str(id_param)
         self.subscription = self.create_subscription(String, 'topic', self.listener_callback, group)
 
     def listener_callback(self, msg):
@@ -186,7 +186,7 @@ class mocap_basic_sub(Node):
         received_id = parts[0]
         position_str = parts[1]  # e.g. "1.234,2.345,3.456"
         rotation_str = parts[2]  # e.g. "0.0000,0.0000,0.0000,1.0000"
-        
+
         if received_id == self.streamid:
             # Further split position and rotation by ','
             position = [float(x) for x in position_str.split(',')]  # [1.234, 2.345, 3.456]
@@ -197,3 +197,32 @@ class mocap_basic_sub(Node):
             print(f"ID: {received_id}")
             print(f"Position: {position}")
             print(f"Rotation: {rotation}")
+
+class complete_node_pub(mocap_basic_pub):
+    def __init__(self):
+        rclpy.init()
+
+        publisher = mocap_basic_pub()
+        try: 
+            rclpy.spin(publisher)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            publisher.destroy_node()
+
+            rclpy.shutdown()
+
+class complete_node_sub(mocap_basic_sub):
+    def __init__(self, id):
+        rclpy.init()
+        
+        self.id = str(id)
+        subscriber = mocap_basic_sub(self.id)
+        try: 
+            rclpy.spin(subscriber)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            subscriber.destroy_node()
+
+            rclpy.shutdown()
