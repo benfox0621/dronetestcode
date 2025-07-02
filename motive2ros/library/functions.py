@@ -90,18 +90,18 @@ class control():
         #     time.sleep(0.1)
 
 class mocap_basic_pub(Node):
-    def __init__(self, name: str, hz = 180, group = 10, local = "10.131.220.228", server = "10.131.196.172"):
+    def __init__(self, hz = 180, group = 10, local = "10.131.220.228", server = "10.131.196.172"):
         #initialize the ip addresses 
         self.rate = hz
         self.localip = local
         self.serverip = server
         self.groupid = group
-        self.name = name
+    
         
         self.counter = 0
         self.client = NatNetClient()
         super().__init__('minimal_publisher')
-        self.publisher_ = self.create_publisher(Pose, name, group)
+        self.publisher_ = self.create_publisher(String, 'topic', group)
 
 
         self.mocap_init()
@@ -111,18 +111,30 @@ class mocap_basic_pub(Node):
         
 
     def rrbf(self, new_id, position, rotation):
+        
+        if not rclpy.ok():
+            return
         # Format as "id;x,y,z;qx,qy,qz,qw"
         pos_str = ",".join(f"{x:.3f}" for x in position)
         rot_str = ",".join(f"{x:.4f}" for x in rotation)
         msg_str = f"{new_id};{pos_str};{rot_str}"
         msg = String()
         msg.data = msg_str
-        self.publisher_.publish(msg)
+
+        print(f"Publishing ID {new_id}: {msg.data}")  # DEBUG
+
+        try:
+            self.publisher_.publish(msg)
+        except Exception as e:
+            self.get_logger().warn(f"Publish failed: {e}")
+            return
+
         
         self.counter += 1
         time = self.counter/self.rate
         if self.counter % 10 == 0:
-            print(f"\rFrame {self.counter} Time {time:.2f} Position: {self.position.x:.3f}, {self.position.y:.3f}, {self.position.z:.3f}", end='', flush=True)
+            pass
+            #print(f"\rFrame {self.counter} Time {time:.2f}", end='', flush=True)
             #self.get_logger().info(f"\rFrame {self.counter} Time {time} Position: {self.position.x}, {self.position.y}, {self.position.z}", end='',flush=True)
         
         
@@ -155,15 +167,33 @@ class mocap_basic_pub(Node):
         super().destroy_node()
                 
 class mocap_basic_sub(Node):
-    def __init__(self, id, name: str, group = 10):
+    def __init__(self, id, group = 10):
         self.groupid = group
-        self.streamid = id
-        self.name = name
-        super().__init__(name)
-        self.subscription = self.create_subscription(Pose, name, self.listener_callback, group)
+        self.streamid = str(id)
+        
+        super().__init__('minimal_subscriber')
+        self.subscription = self.create_subscription(String, 'topic', self.listener_callback, group)
 
     def listener_callback(self, msg):
-        x, y, z = msg.position
-        qx,qy,qz,qw = msg.orientation
-        print(f"Position: x={x}, y={y}, z={z}")
-        print(f"Orientation: x={qx}, y={qy}, z={qz}, w={qw}")
+        data = msg.data  # e.g. "5;1.234,2.345,3.456;0.0000,0.0000,0.0000,1.0000"
+        
+        # Split the string by ';' into parts: [id, position_str, rotation_str]
+        parts = data.split(';')
+        if len(parts) != 3:
+            self.get_logger().warning(f"Unexpected data format: {data}")
+            return
+        
+        received_id = parts[0]
+        position_str = parts[1]  # e.g. "1.234,2.345,3.456"
+        rotation_str = parts[2]  # e.g. "0.0000,0.0000,0.0000,1.0000"
+        
+        if received_id == self.streamid:
+            # Further split position and rotation by ','
+            position = [float(x) for x in position_str.split(',')]  # [1.234, 2.345, 3.456]
+            rotation = [float(x) for x in rotation_str.split(',')]  # [0.0, 0.0, 0.0, 1.0]
+        
+            # Now you can use received_id, position, and rotation as needed
+        
+            print(f"ID: {received_id}")
+            print(f"Position: {position}")
+            print(f"Rotation: {rotation}")

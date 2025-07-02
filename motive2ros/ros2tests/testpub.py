@@ -5,7 +5,7 @@ from rclpy.node import Node
 def main():
     rclpy.init()
 
-    publisher = mocap_basic_pub('bob')
+    publisher = mocap_basic_pub()
     try: 
         rclpy.spin(publisher)
     except KeyboardInterrupt:

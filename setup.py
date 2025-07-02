@@ -12,7 +12,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
-    install_requires=['setuptools'],
+    install_requires=['setuptools>=80.0.0'],
     zip_safe=True,
     maintainer='optimalx',
     maintainer_email='fox00330@umn.edu',
