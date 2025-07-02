@@ -4,6 +4,8 @@ Motive2Ros is a Ros 2 Humble Hawksbill package designed to assist communication 
 
 ## Installation
 
+Note: This package depends on the Cross Platform NatNetSDK from [Whoening on Github.](https://github.com/whoenig/NatNetSDKCrossplatform) The files "NatNetClient.py", "DataDescriptions.py", and "MoCapData.py" from /samples/PythonClient must go in the /library folder, and their mutual imports may have to be altered to the filepath motive2ros.library.{file name}.
+
 Navigate to the /src folder of your Ros workspace. Clone the repo in the space and colcon build it like any other ros package.
 ```bash 
 git clone https://github.com/benfox0621/motive2ros.git

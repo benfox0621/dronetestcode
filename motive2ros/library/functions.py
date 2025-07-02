@@ -1,7 +1,11 @@
 import sys
 import time
+try:
+    from motive2ros.library.NatNetClient import NatNetClient  # or whatever module you're using
+except ImportError:
+    print("Please download the NatNet SDK and place the Python client in the proper directory.")
+    exit(1)
 
-from motive2ros.library.NatNetClient import NatNetClient
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
