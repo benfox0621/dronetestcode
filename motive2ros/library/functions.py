@@ -233,3 +233,33 @@ class complete_node_sub(mocap_basic_sub):
             subscriber.destroy_node()
 
             rclpy.shutdown()
+
+class mocap_communicator_node(Node):
+    def __init__(self, group):
+        self.group=group
+        super().__init__('mocap_communicator_node')
+        self.declare_parameter('id', 0)
+        id_param = self.get_parameter('id').get_parameter_value().integer_value
+        self.streamid = str(id_param)
+        self.subscription = self.create_subscription(String, 'topic', self.listener_callback, self.group)
+
+    def listener_callback(self, msg):
+        data = msg.data
+
+        # Split the string by ';' into parts: [id, position_str, rotation_str]
+        parts = data.split(';')
+        if len(parts) != 3:
+            self.get_logger().warning(f"Unexpected data format: {data}")
+            return
+        
+        received_id = parts[0]
+        position_str = parts[1]  
+        rotation_str = parts[2]  
+
+        if received_id == self.streamid:
+            # Further split position and rotation by ','
+            position = [float(x) for x in position_str.split(',')]  
+            rotation = [float(x) for x in rotation_str.split(',')]  
+
+            
+        
