@@ -1,14 +1,13 @@
 import sys
 import time
 
-from NatNetClient import NatNetClient
+from motive2ros.library.NatNetClient import NatNetClient
 import rclpy
 from rclpy import node
 from std_msgs.msg import String
 
 
-import DataDescriptions
-import MoCapData
+
 import threading
 import cflib.crtp
 from cflib.crazyflie import Crazyflie

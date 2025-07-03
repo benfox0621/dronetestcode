@@ -1,10 +1,10 @@
 import sys
 import time
-try:
-    from motive2ros.library.NatNetClient import NatNetClient  # or whatever module you're using
-except ImportError:
-    print("Please download the NatNet SDK and place the Python client in the proper directory.")
-    exit(1)
+#try:
+from motive2ros.library.NatNetClient import NatNetClient  # or whatever module you're using
+#except ImportError:
+    #print("Please download the NatNet SDK and place the Python client in the proper directory.")
+    #exit(1)
 
 import rclpy
 from rclpy.node import Node
@@ -73,17 +73,20 @@ class control():
         cf.platform.send_arming_request(True)
         print("Crazyflie armed")
         cf.param.set_value('stabilizer.estimator', '2')
+        time.sleep(1)
         print('values set')
        
 
-    def takeoff(self, cf: Crazyflie):
+    def takeoff(self, cf: SyncCrazyflie):
         global newpos
         global newrot
-        commander = cf.high_level_commander
+        with MotionCommander(cf, 0.5) as mc:
 
-        commander.takeoff(0.5, 5)
-        time.sleep(5)
-        commander.stop()
+           
+           time.sleep(5)
+           mc.land()
+           time.sleep(5)
+        
         # this part doesnt work ^^^ the stop function doesnt do anything for some reason, need to investigate further
 
         # while newpos is None or newrot is None:
