@@ -292,6 +292,7 @@ class sc_flight():
             mc.land()
             print("landing")
             time.sleep(5)
+            
     def disconnect(self):
         if self.scf:
             
