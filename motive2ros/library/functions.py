@@ -51,6 +51,7 @@ class control():
         self.client.set_server_address(server_ip)
         self.client.rigid_body_listener = self.rrbf
         self.client.set_print_level(0)
+        self.counter = 0
         
         while True:
             self.client.run('d')
@@ -68,8 +69,11 @@ class control():
                     x, y, z = newpos
                     qx, qy, qz, qw = newrot
                     cf.extpos.send_extpose(x, y, z, qx, qy, qz, qw)
-                    print(f"Sending extpos: x={x:.2f}, y={y:.2f}, z={z:.2f}")
-                time.sleep(0.1)
+                    self.counter +=1 
+                    if self.counter%50 == 0:
+
+                        print(f"Sending extpos: x={x:.2f}, y={y:.2f}, z={z:.2f}")
+                time.sleep(0.02)
         
         self.client.shutdown()
 
@@ -79,8 +83,11 @@ class control():
         
         cf.platform.send_arming_request(True)
         print("Crazyflie armed")
-        cf.param.set_value('stabilizer.estimator', '2')
-        time.sleep(1)
+        cf.param.set_value('stabilizer.estimator', '2')  # Kalman
+        cf.param.set_value('kalman.resetEstimation', '1')
+        time.sleep(0.1)
+        cf.param.set_value('kalman.resetEstimation', '0')
+        time.sleep(5)
         print('values set')
        
 
@@ -280,19 +287,27 @@ class sc_flight():
         self.scf.__enter__()
         self.cf = self.scf.cf
         controller = control(id)
-        controller.init_drone(self.cf)
+        
         self.stop_event = threading.Event()
         self.mocap = threading.Thread(target=controller.mocap_listener, args=(local,  self.stop_event, self.cf,server))
         self.mocap.start()
+
+        controller.init_drone(self.cf)
+        
     def takeoff(self):
-        with MotionCommander(self.cf, 0.5) as mc:
-            print("taking off")
-           
-            time.sleep(5)
-            mc.land()
-            print("landing")
-            time.sleep(5)
-            
+        self.commander = self.cf.high_level_commander
+        time.sleep(1)
+        self.commander.takeoff(1, 5)
+        time.sleep(5)
+
+        self.commander.go_to(0, 0, 1, 0, 5)
+        time.sleep(5)
+
+        self.commander.land(0, 5)
+        time.sleep(3)
+        
+
+
     def disconnect(self):
         if self.scf:
             
