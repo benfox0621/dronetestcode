@@ -28,36 +28,41 @@ newrot = None
 lock = threading.Lock()
 
 class control():
+    def __init__(self, id):
+        self.id  = id
     def rrbf(self, new_id, position, rotation):
         global newpos
         global newrot
-    
-        newpos = position
-        newrot = rotation
+        if new_id == self.id:
+            newpos = position
+            newrot = rotation
+        else: 
+            pass
 
-    def mocap_listener(self, local_ip, cf: Crazyflie, server_ip: str = '10.131.196.172'):
+    def mocap_listener(self, local_ip, stop_event: threading.Event, cf: Crazyflie, server_ip: str = '10.131.196.172'):
         global newpos
         global newrot
+        
         # local_ip and server_ip should be used as strings
 
-        client = NatNetClient()
-        client.set_use_multicast(False)
-        client.set_client_address(local_ip)
-        client.set_server_address(server_ip)
-        client.rigid_body_listener = self.rrbf
-        client.set_print_level(0)
+        self.client = NatNetClient()
+        self.client.set_use_multicast(False)
+        self.client.set_client_address(local_ip)
+        self.client.set_server_address(server_ip)
+        self.client.rigid_body_listener = self.rrbf
+        self.client.set_print_level(0)
         
         while True:
-            client.run('d')
+            self.client.run('d')
 
             time.sleep(1)
-            if client.connected():
+            if self.client.connected():
                 print("Connected to server")
                 break
             else:
                 print("Not connected")
         
-        while True:
+        while not stop_event.is_set():
             with lock:
                 if newpos is not None and newrot is not None:
                     x, y, z = newpos
@@ -65,6 +70,8 @@ class control():
                     cf.extpos.send_extpose(x, y, z, qx, qy, qz, qw)
                     print(f"Sending extpos: x={x:.2f}, y={y:.2f}, z={z:.2f}")
                 time.sleep(0.1)
+        
+        self.client.shutdown()
 
                     # 10hz data send rate
 
@@ -86,8 +93,10 @@ class control():
            time.sleep(5)
            mc.land()
            time.sleep(5)
+
+ 
+
         
-        # this part doesnt work ^^^ the stop function doesnt do anything for some reason, need to investigate further
 
         # while newpos is None or newrot is None:
         #     time.sleep(1)
@@ -261,5 +270,37 @@ class mocap_communicator_node(Node):
             position = [float(x) for x in position_str.split(',')]  
             rotation = [float(x) for x in rotation_str.split(',')]  
 
+class sc_flight():
+    def __init__(self, local: str, server: str, id: int):
+        cflib.crtp.init_drivers()
+        self.localip = local
+        self.serverip = server
+        uri = uri_helper.uri_from_env(default='radio://0/80/2M/E7E7E7E7E7')
+        self.scf = SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache'))
+        self.scf.__enter__()
+        self.cf = self.scf.cf
+        controller = control(id)
+        controller.init_drone(self.cf)
+        self.stop_event = threading.Event()
+        self.mocap = threading.Thread(target=controller.mocap_listener, args=(local,  self.stop_event, self.cf,server))
+        self.mocap.start()
+    def takeoff(self):
+        with MotionCommander(self.cf, 0.5) as mc:
+            print("taking off")
+           
+            time.sleep(5)
+            mc.land()
+            print("landing")
+            time.sleep(5)
+    def disconnect(self):
+        if self.scf:
             
-        
+            self.stop_event.set()
+            self.mocap.join()
+            self.scf.__exit__(None, None, None)
+
+            print("disconnected")
+            print("All done. Active threads:")
+            for t in threading.enumerate():
+                print(f"- {t.name} (daemon={t.daemon})")
+       
