@@ -84,10 +84,9 @@ class control():
         cf.platform.send_arming_request(True)
         print("Crazyflie armed")
         cf.param.set_value('stabilizer.estimator', '2')  # Kalman
-        cf.param.set_value('kalman.resetEstimation', '1')
-        time.sleep(0.1)
-        cf.param.set_value('kalman.resetEstimation', '0')
-        time.sleep(5)
+        cf.param.set_value('commander.enHighLevel', '1')
+        reset_estimator(cf)
+        time.sleep(10)
         print('values set')
        
 
