@@ -1,5 +1,8 @@
 import sys
 import time
+import csv
+import datetime
+import os
 #try:
 from motive2ros.library.NatNetClient import NatNetClient  # or whatever module you're using
 #except ImportError:
@@ -22,14 +25,14 @@ from cflib.utils import uri_helper
 from cflib.utils.reset_estimator import reset_estimator
 from cflib.positioning.motion_commander import  MotionCommander
 
-newpos = None
-newrot = None
 
-lock = threading.Lock()
+
+
 
 class control():
     def __init__(self, id):
         self.id  = id
+        self.lock = threading.Lock()
     def rrbf(self, new_id, position, rotation):
         global newpos
         global newrot
@@ -64,15 +67,15 @@ class control():
                 print("Not connected")
         
         while not stop_event.is_set():
-            with lock:
+            with self.lock:
                 if newpos is not None and newrot is not None:
                     x, y, z = newpos
                     qx, qy, qz, qw = newrot
                     cf.extpos.send_extpose(x, y, z, qx, qy, qz, qw)
                     self.counter +=1 
-                    if self.counter%50 == 0:
-
-                        print(f"Sending extpos: x={x:.2f}, y={y:.2f}, z={z:.2f}")
+                    #if self.counter%50 == 0:
+                        
+                        #print(f"Sending extpos: x={x:.2f}, y={y:.2f}, z={z:.2f}")
                 time.sleep(0.02)
         
         self.client.shutdown()
@@ -86,7 +89,7 @@ class control():
         cf.param.set_value('stabilizer.estimator', '2')  # Kalman
         cf.param.set_value('commander.enHighLevel', '1')
         reset_estimator(cf)
-        time.sleep(10)
+        time.sleep(5)
         print('values set')
        
 
@@ -277,34 +280,138 @@ class mocap_communicator_node(Node):
             rotation = [float(x) for x in rotation_str.split(',')]  
 
 class sc_flight():
-    def __init__(self, local: str, server: str, id: int):
+    def __init__(self, local: str, server: str, id: int, uri):
+        self.lock = threading.Lock()
         cflib.crtp.init_drivers()
+        print(f"drivers initiated for drone {id}")
         self.localip = local
         self.serverip = server
-        uri = uri_helper.uri_from_env(default='radio://0/80/2M/E7E7E7E7E7')
+        self.uri = uri_helper.uri_from_env(uri)
         self.scf = SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache'))
         self.scf.__enter__()
         self.cf = self.scf.cf
-        controller = control(id)
+        
+        self.id = id
         
         self.stop_event = threading.Event()
-        self.mocap = threading.Thread(target=controller.mocap_listener, args=(local,  self.stop_event, self.cf,server))
+        self.mocap = threading.Thread(target=self.mocap_listener, args=(local,  self.stop_event, self.cf,server))
         self.mocap.start()
 
-        controller.init_drone(self.cf)
-        
-    def takeoff(self):
+        self.init_drone(self.cf)
         self.commander = self.cf.high_level_commander
         time.sleep(1)
-        self.commander.takeoff(1, 5)
-        time.sleep(5)
 
-        self.commander.go_to(0, 0, 1, 0, 5)
-        time.sleep(5)
-
-        self.commander.land(0, 5)
-        time.sleep(3)
+    def init_drone(self, cf: Crazyflie):
         
+        cf.platform.send_arming_request(True)
+        print("Crazyflie armed")
+        cf.param.set_value('stabilizer.estimator', '2')  # Kalman
+        cf.param.set_value('commander.enHighLevel', '1')
+        reset_estimator(cf)
+        time.sleep(5)
+        print('values set')
+       
+    def rrbf(self, new_id, position, rotation):
+        
+        if new_id == self.id:
+            self.newpos = position
+            self.newrot = rotation
+        else: 
+            pass
+
+    def mocap_listener(self, local_ip, stop_event: threading.Event, cf: Crazyflie, server_ip: str = '10.131.196.172'):
+        
+        
+        # local_ip and server_ip should be used as strings
+
+        self.client = NatNetClient()
+        self.client.set_use_multicast(False)
+        self.client.set_client_address(local_ip)
+        self.client.set_server_address(server_ip)
+        self.client.rigid_body_listener = self.rrbf
+        self.client.set_print_level(0)
+        self.counter = 0
+        
+        while True:
+            self.client.run('d')
+
+            time.sleep(1)
+            if self.client.connected():
+                print("Connected to server")
+                break
+            else:
+                print("Not connected")
+        
+        while not stop_event.is_set():
+            with self.lock:
+                if self.newpos is not None and self.newrot is not None:
+                    x, y, z = self.newpos
+                    qx, qy, qz, qw = self.newrot
+                    cf.extpos.send_extpose(x, y, z, qx, qy, qz, qw)
+                    self.counter +=1 
+                    if self.counter%50 == 0:
+                        
+                        print(f"Sending extpos for id: {self.id}: x={x:.2f}, y={y:.2f}, z={z:.2f}")
+                time.sleep(0.02)
+        
+        self.client.shutdown()
+
+                    # 10hz data send rate
+
+    
+    def logger_thread(self, rr: int):
+        """
+        CSV Logger Method logs pose data into a csv file. 
+        
+        Args:
+            rr (int): Data write rate in HZ
+
+        """
+        package_root = os.path.dirname(os.path.abspath(__file__))  # motive2ros/library
+        log_dir = os.path.join(package_root, '..', 'logs')         # motive2ros/logs
+        os.makedirs(log_dir, exist_ok=True)
+        filename = datetime.datetime.now().strftime("log_%Y%m%d_%H%M%S.csv")
+        filepath = os.path.join(log_dir, filename)
+        
+        self.csvfile = open(filepath, 'a', newline='')
+        csvwriter = csv.writer(self.csvfile)
+        
+        
+        duration = 1/rr
+        try:
+            while not self.stop_event.is_set():
+                timestamp = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                x, y, z = self.newpos
+                x_rounded = round(x, 3)
+                y_rounded = round(y, 3)
+                z_rounded = round(z, 3)
+                data_row = [timestamp, x_rounded, y_rounded, z_rounded]
+                csvwriter.writerow(data_row)
+                self.csvfile.flush() 
+                #print(f"Data logged: {data_row}")
+                time.sleep(duration)
+        finally:
+            self.csvfile.close()
+
+    def csv_logger(self, rr: int):
+        self.loggerthread = threading.Thread(target=self.logger_thread, args=(rr,))
+        self.loggerthread.start()
+        
+    def takeoff(self, height, sec):
+        
+        self.commander.takeoff(height, sec)
+        print(f"Taking off to {height} meters over {sec} seconds.")
+        time.sleep(sec)
+    
+    def go_to(self, x, y, z, yaw, sec):
+        self.commander.go_to(x, y, z, yaw, sec)
+        print(f"Moving to {x}, {y}, {z} over {sec} seconds.")
+        time.sleep(sec)
+    
+    def land(self, height, sec):
+        self.commander.land(height, sec)
+        print(f"Landing to {height} meters over {sec} seconds.")
+        time.sleep(sec)
 
 
     def disconnect(self):
@@ -312,6 +419,8 @@ class sc_flight():
             
             self.stop_event.set()
             self.mocap.join()
+            if hasattr(self, 'loggerthread') and self.loggerthread:
+                self.loggerthread.join()
             self.scf.__exit__(None, None, None)
 
             print("disconnected")
