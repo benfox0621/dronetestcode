@@ -1,7 +1,6 @@
 from motive2ros.library import functions
 import time
 import threading
-from multiprocessing import Process
 def main(id, uri, local = "10.131.220.228", server = "10.131.196.172"):
     uristring = 'radio://0/80/2M/' +  uri
     print(uristring)
@@ -11,14 +10,14 @@ def main(id, uri, local = "10.131.220.228", server = "10.131.196.172"):
     if id == 10:
         controller.go_to(2,1,2,0,5)
         controller.go_to(2,-1,2,0,5)
-        controller.go_to(-2,-1,2,0,5)
-        controller.go_to(-2,1,2,0,5)
+        controller.go_to(-1,-1,2,0,5)
+        controller.go_to(-1,1,2,0,5)
         controller.go_to(0,0,2,0,5)
     else:
         controller.go_to(2,1,1,0,5)
         controller.go_to(2,-1,1,0,5)
-        controller.go_to(-2,-1,1,0,5)
-        controller.go_to(-2,1,1,0,5)
+        controller.go_to(-1,-1,1,0,5)
+        controller.go_to(-1,1,1,0,5)
         controller.go_to(1,0,1,0,5)
     controller.land(0,5)
     controller.disconnect()

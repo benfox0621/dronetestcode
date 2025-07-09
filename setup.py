@@ -22,7 +22,8 @@ setup(
     entry_points={
         'console_scripts': [
             'talker = motive2ros.ros2tests.testpub:main',
-            'listener = motive2ros.ros2tests.testsub:main'
+            'listener = motive2ros.ros2tests.testsub:main',
+            'posevis = motive2ros.ros2tests.rviz_mocap:main'
             
         ],
     },

@@ -12,7 +12,7 @@ from motive2ros.library.NatNetClient import NatNetClient  # or whatever module y
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
-from geometry_msgs.msg import Pose, Point, Quaternion
+from geometry_msgs.msg import Pose, Point, Quaternion, PoseStamped
 
 
 import threading
@@ -194,9 +194,15 @@ class mocap_basic_sub(Node):
         
         
         super().__init__('minimal_subscriber')
+
         self.declare_parameter('id', 0)
         id_param = self.get_parameter('id').get_parameter_value().integer_value
         self.streamid = str(id_param)
+        
+        self.declare_parameter('uri', 'E7E7E7E7E7')
+        uri_param = self.get_parameter('uri').get_parameter_value().string_value
+        self.uri = uri_param
+
         self.subscription = self.create_subscription(String, 'topic', self.listener_callback, group)
 
     def listener_callback(self, msg):
@@ -427,4 +433,80 @@ class sc_flight():
             print("All done. Active threads:")
             for t in threading.enumerate():
                 print(f"- {t.name} (daemon={t.daemon})")
-       
+
+class rviz_connector(Node):
+    def __init__(self, id, local, server):
+        super().__init__('minimal_publisher')
+        topic_name = f'/drone{id}/pose'
+        self.publisher_ = self.create_publisher(PoseStamped, topic_name, 10)
+        
+        self.client = NatNetClient()
+        self.localip =  local
+        self.serverip = server
+        self.id = id
+        self.counter = 0
+        self.mocap = threading.Thread(target=self.mocap_start)
+        self.stop_event = threading.Event()
+        self.mocap.start()
+        
+
+    def rrbf(self, new_id, position, rotation):       
+        if new_id == self.id:
+            self.newpos = position
+            self.newrot = rotation
+            msg = PoseStamped()
+            self.counter += 1
+            msg.header.frame_id = str(self.counter)
+            msg.pose.position = Point()
+            pos = msg.pose.position 
+            pos.x, pos.y, pos.z = self.newpos
+            msg.pose.orientation = Quaternion()
+            quat = msg.pose.orientation
+            quat.x, quat.y, quat.z, quat.w = self.newrot
+            self.publisher_.publish(msg)
+        else: 
+            pass
+
+    def mocap_start(self):
+        self.client.set_use_multicast(False)
+        self.client.set_client_address(self.localip)
+        self.client.set_server_address(self.serverip)
+        self.client.rigid_body_listener = self.rrbf
+        self.client.set_print_level(0)
+
+        # connect loop until it connects
+        while True:
+            self.client.run('d')
+
+            time.sleep(1)
+            if self.client.connected():
+                
+                break
+            else:
+                print("Not connected")
+
+    def disconnect(self):
+        self.stop_event.set()
+        self.mocap.join()
+        
+        
+
+        print("disconnected")
+        print("All done. Active threads:")
+        for t in threading.enumerate():
+            print(f"- {t.name} (daemon={t.daemon})")
+
+class rviz_node(rviz_connector):
+    def __init__(self, id = 10, local = "10.131.220.228", server = "10.131.196.172"):
+        rclpy.init()
+
+        publisher = rviz_connector(id, local, server)
+        try: 
+            rclpy.spin(publisher)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            publisher.disconnect()
+            publisher.destroy_node()
+
+            rclpy.shutdown()
