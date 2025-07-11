@@ -1,8 +1,9 @@
-from motive2ros.library.functions import rviz_node
+from motive2ros.library.nodeflight import MocapCaller
 import time
 import rclpy
 def main(): 
-    connector = rviz_node(10)
+    ids = {10,11}
+    MocapCaller("10.131.220.228","10.131.196.172", ids)
 
 
 if __name__ == '__main__':
