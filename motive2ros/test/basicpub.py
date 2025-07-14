@@ -1,11 +1,8 @@
 import sys
 import time
 
-import rclpy 
-from rclpy.node import Node
-
 from std_msgs.msg import String
-from NatNetClient import NatNetClient
+from motive2ros.library.NatNetClient import NatNetClient
 
 
 
@@ -17,7 +14,7 @@ def rrbf(new_id, position, rotation):
             
      
         else:
-            print('you suck at coding')
+            print('invalid data')
 
 def start_natnet_client():
         
