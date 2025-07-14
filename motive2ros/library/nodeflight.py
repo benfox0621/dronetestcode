@@ -1,8 +1,8 @@
 from motive2ros.library.NatNetClient import NatNetClient
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Pose, Quaternion
-from std_msgs.msg import String
+from geometry_msgs.msg import Pose, Quaternion, PoseStamped, Point
+from std_msgs.msg import String, Header
 import threading
 import cflib.crtp
 from cflib.crazyflie import Crazyflie
@@ -13,6 +13,7 @@ from cflib.utils import uri_helper
 from cflib.utils.reset_estimator import reset_estimator
 from cflib.positioning.motion_commander import  MotionCommander
 import time
+import datetime
 
 
 class MocapPublisherNode(Node):
@@ -29,7 +30,7 @@ class MocapPublisherNode(Node):
         
         for i in self.ids:
             topic = f'/drone{i}/pose'
-            self.publishers_[i]  = self.create_publisher(String, topic, 10)
+            self.publishers_[i]  = self.create_publisher(PoseStamped, topic, 10)
         self.client = NatNetClient()
         self.client.set_use_multicast(False)
         self.client.set_client_address(self.local_ip)
@@ -41,19 +42,32 @@ class MocapPublisherNode(Node):
         self.stop_event = threading.Event()
         self.main = threading.Thread(target=self.main_thread)
         self.main.start()
+        self.starttime = 0
         
 
     def rrbf(self, new_id, position, rotation):
         if not rclpy.ok():
             return 
         if new_id in self.ids:
-            msg=String()
+            msg=PoseStamped()
             x, y, z = position
             qx, qy, qz, qw = rotation
-            msg.data = f"{new_id},{x:.3f},{y:.3f},{z:.3f},{qx:.3f},{qy:.3f},{qz:.3f},{qw:.3f}"
+            #msg.data = f"{new_id},{x:.3f},{y:.3f},{z:.3f},{qx:.3f},{qy:.3f},{qz:.3f},{qw:.3f}"
+            
+            self.counter += 1
+            msg.header.frame_id = 'map'
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.pose.position.x = x
+            msg.pose.position.y = y
+            msg.pose.position.z = z
+            msg.pose.orientation.x = qx
+            msg.pose.orientation.y = qy
+            msg.pose.orientation.z = qz
+            msg.pose.orientation.w = qw
+    
             with self.lock:
                 self.publishers_[new_id].publish(msg)
-                self.get_logger().info('Publishing: "%s"' % msg.data)
+                self.get_logger().info('Publishing: "%s"' % msg)
         
     def main_thread(self):
         while True:
@@ -99,3 +113,12 @@ class MocapCaller():
             publisher_.destroy_node()
             if rclpy.ok():
                 rclpy.shutdown()
+
+class ControlPublisher(Node):
+    def __init__(self, id):
+        self.id = id
+        name = f'drone{id}_controller'
+        super.__init__(name)
+        topic = f'drone{id}/control'
+        publisher_ = self.create_publisher(Point, topic, 10)
+
