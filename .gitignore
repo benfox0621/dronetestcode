@@ -2,4 +2,7 @@ motive2ros/library/NatNetClient.py
 motive2ros/library/DataDescriptions.py
 motive2ros/library/MoCapData.py
 motive2ros/logs/
-motive2ros/.venv/
+motive2ros/ros2tests/
+motive2ros/cache/
+motive2ros/__pycache__/
+motive2ros/library/__pycache__/
