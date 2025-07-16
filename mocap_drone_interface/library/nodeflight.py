@@ -1,4 +1,4 @@
-from motive2ros.library.NatNetClient import NatNetClient
+from mocap_drone_interface.library.NatNetClient import NatNetClient
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Pose, Quaternion, PoseStamped, Point
@@ -53,7 +53,7 @@ class MocapPublisherNode(Node):
             x, y, z = position
             qx, qy, qz, qw = rotation
             #msg.data = f"{new_id},{x:.3f},{y:.3f},{z:.3f},{qx:.3f},{qy:.3f},{qz:.3f},{qw:.3f}"
-            
+    
             self.counter += 1
             msg.header.frame_id = 'map'
             msg.header.stamp = self.get_clock().now().to_msg()

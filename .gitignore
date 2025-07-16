@@ -1,8 +1,8 @@
-motive2ros/library/NatNetClient.py
-motive2ros/library/DataDescriptions.py
-motive2ros/library/MoCapData.py
-motive2ros/logs/
-motive2ros/ros2tests/
-motive2ros/cache/
-motive2ros/__pycache__/
-motive2ros/library/__pycache__/
+mocap_drone_interface/library/NatNetClient.py
+mocap_drone_interface/library/DataDescriptions.py
+mocap_drone_interface/library/MoCapData.py
+mocap_drone_interface/logs/
+mocap_drone_interface/ros2tests/
+mocap_drone_interface/cache/
+mocap_drone_interface/__pycache__/
+mocap_drone_interface/library/__pycache__/

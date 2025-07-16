@@ -4,7 +4,7 @@ import csv
 import datetime
 import os
 #try:
-from motive2ros.library.NatNetClient import NatNetClient  # or whatever module you're using
+from mocap_drone_interface.library.NatNetClient import NatNetClient  # or whatever module you're using
 #except ImportError:
     #print("Please download the NatNet SDK and place the Python client in the proper directory.")
     #exit(1)
@@ -373,8 +373,8 @@ class sc_flight():
             rr (int): Data write rate in HZ
 
         """
-        package_root = os.path.dirname(os.path.abspath(__file__))  # motive2ros/library
-        log_dir = os.path.join(package_root, '..', 'logs')         # motive2ros/logs
+        package_root = os.path.dirname(os.path.abspath(__file__))  
+        log_dir = os.path.join(package_root, '..', 'logs')        
         os.makedirs(log_dir, exist_ok=True)
         filename = datetime.datetime.now().strftime("log_%Y%m%d_%H%M%S.csv")
         filepath = os.path.join(log_dir, filename)
